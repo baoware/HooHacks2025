@@ -7,7 +7,7 @@ model = torch.hub.load('./yolov5', 'yolov5s', source='local')
 model.eval()  
 
 # Set of target classes relevant for obstacles for blind pedestrians.
-target_classes = {"person", "bench", "dog", "truck", "bus", "motorbike", "bicycle"}
+target_classes = {"person", "bench", "dog", "truck", "bus", "motorbike", "bicycle", "stop sign", "fire hydrant", "traffic light"}
 
 # Webcam interface
 cap = cv2.VideoCapture(0)

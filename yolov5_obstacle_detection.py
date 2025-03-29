@@ -4,7 +4,7 @@ import numpy as np
 
 # Load the local yolov5
 model = torch.hub.load('./yolov5', 'yolov5s', source='local')
-model.eval()  # set in evaluation mode
+model.eval()  
 
 # Set of target classes relevant for obstacles for blind pedestrians.
 target_classes = {"person", "bench", "dog", "truck", "bus", "motorbike", "bicycle"}
@@ -24,7 +24,7 @@ while True:
         print("Failed to capture frame")
         break
 
-    # Run YOLOv5 detection
+    # Run yolov5 detection
     results = model(frame)
     
     detections = results.xyxy[0]
