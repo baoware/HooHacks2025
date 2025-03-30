@@ -13,20 +13,21 @@ process = None
 
 def toggle_program():
     """
-    On a short button press, start the obstacle detection program in a new terminal window.
+    On a short button press, open a new terminal and run the obstacle detection program.
+    The terminal remains open after the program completes.
     """
     global process
     if process is None:
         print("Starting the obstacle detection program in a new terminal...")
-        # Construct absolute paths
+        # Construct absolute paths for clarity.
         script_path = os.path.join(os.getcwd(), "yolov5", "yolov5_obstacle_detection3.py")
         weights_path = os.path.join(os.getcwd(), "yolov5n.pt")
-        # Build the command to run in the new terminal.
-        # For LXTerminal, you can use the -e option:
+        # Build the command to run in a new terminal window.
+        # Using lxterminal with a bash command that ends with 'exec bash' to keep the terminal open.
         cmd = [
             "lxterminal",
-            "-e",  # execute the following command
-            f"{sys.executable} {script_path} --weights {weights_path} --source 0 --img 640"
+            "-e",
+            f"bash -c '{sys.executable} {script_path} --weights {weights_path} --source 0 --img 640; exec bash'"
         ]
         process = subprocess.Popen(cmd, env=os.environ.copy())
     else:
@@ -39,7 +40,7 @@ def long_press_callback():
     print("Long press detected. Raising KeyboardInterrupt!")
     raise KeyboardInterrupt
 
-# Bind the short press and long press events to their functions.
+# Bind the button events.
 button.when_pressed = toggle_program
 button.when_held = long_press_callback
 
@@ -47,7 +48,6 @@ def main():
     print("System ready:")
     print("- Press the button briefly to open a new terminal and run the obstacle detection program (if not already running).")
     print("- Hold the button for 3 seconds to simulate a KeyboardInterrupt and restart the button program.")
-
     try:
         while True:
             time.sleep(1)
@@ -60,7 +60,7 @@ def main():
             except OSError:
                 pass  # Process may already have ended.
             process = None
-        # Restart the current script
+        # Restart this button script
         os.execv(sys.executable, [sys.executable] + sys.argv)
 
 if __name__ == '__main__':
