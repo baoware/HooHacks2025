@@ -1,3 +1,6 @@
+python3 yolov5/yolov5_obstacle_detection3.py --weights yolov5n.pt --source 0 --img 640^C
+
+
 from gpiozero import Button
 import subprocess
 import time
