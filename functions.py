@@ -19,18 +19,20 @@ def calculate_distance(label, bbox_height, focal_length, known_heights):
         return float('inf')
     return (object_height * focal_length) / bbox_height
 
-def check_incoming(center, current_distance, previous_detections, movement_threshold=50, distance_delta=0.01):
-    center_x, center_y = center
-    min_diff = float("inf")
-    matching_distance = None
-    for (prev_x, prev_y, prev_distance) in previous_detections:
-        diff = math.hypot(center_x - prev_x, center_y - prev_y)
-        if diff < min_diff and diff < movement_threshold:
-            min_diff = diff
-            matching_distance = prev_distance
-    if matching_distance is not None and current_distance < matching_distance - distance_delta:
-        return True
-    return False
+def check_incoming(center, distance, prev_detections, alerted_detections,
+                   movement_threshold=50, distance_delta=0.1):
+    for (ax, ay, _) in alerted_detections:
+        if math.hypot(center[0] - ax, center[1] - ay) < movement_threshold:
+            return False
+
+    for (px, py, prev_distance) in prev_detections:
+        if math.hypot(center[0] - px, center[1] - py) < movement_threshold:
+            if distance < prev_distance - distance_delta:
+                return True
+            else:
+                return False
+            
+    return True
 
 
 
