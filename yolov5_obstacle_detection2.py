@@ -33,7 +33,7 @@ import csv
 import os
 import platform
 import sys
-import time  # needed for alert timing
+import time  # needed for alert timing and logging frequency
 from pathlib import Path
 
 import torch
@@ -79,7 +79,7 @@ def run(
     device="",  # cuda device, i.e. 0 or 0,1,2,3 or cpu
     view_img=False,  # show results
     save_txt=False,  # save results to *.txt
-    save_format=0,  # save boxes coordinates in YOLO format or Pascal-VOC format (0 for YOLO and 1 for Pascal-VOC)
+    save_format=0,  # save boxes coordinates in YOLO format or Pascal-VOC format
     save_csv=False,  # save results in CSV format
     save_conf=False,  # save confidences in --save-txt labels
     save_crop=False,  # save cropped prediction boxes
@@ -100,12 +100,16 @@ def run(
     vid_stride=1,  # video frame-rate stride
 ):
     """
-    Runs YOLOv5 detection inference on various sources like images, videos, directories, streams, etc.
+    Runs YOLOv5 detection inference on various sources.
     
     New functionality:
-      - If a detected object is a "person," the code calculates an approximate distance.
-      - If the person is within 20m and at least 15 seconds have passed since the last alert, an alert message is printed.
+      - Only allowed classes ("person", "bicycle", "dog", "stop sign", "traffic light") are processed.
+      - For "person" detections, an approximate distance is calculated and an alert is printed
+        if a person is within 20m and at least 15 seconds have passed since the last alert.
+      - The script logs inference information only every 10 frames.
+      - Only detections with 0.50 or higher confidence are processed and rendered.
     """
+    # Allowed classes for annotation
     allowed_classes = {"person", "bicycle", "dog", "stop sign", "traffic light"}
 
     source = str(source)
@@ -118,17 +122,17 @@ def run(
         source = check_file(source)  # download
 
     # Directories
-    save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
-    (save_dir / "labels" if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+    save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)
+    (save_dir / "labels" if save_txt else save_dir).mkdir(parents=True, exist_ok=True)
 
     # Load model
     device = select_device(device)
     model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half)
     stride, names, pt = model.stride, model.names, model.pt
-    imgsz = check_img_size(imgsz, s=stride)  # check image size
+    imgsz = check_img_size(imgsz, s=stride)
 
     # Dataloader setup
-    bs = 1  # batch_size
+    bs = 1  # batch size
     if webcam:
         view_img = check_imshow(warn=True)
         dataset = LoadStreams(source, img_size=imgsz, stride=stride, auto=pt, vid_stride=vid_stride)
@@ -142,22 +146,24 @@ def run(
     # Run inference warmup
     model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))
     
-    # --- New alert parameters for person detection ---
-    last_person_alert_time = 0  # Timestamp of the last alert
-    alert_interval = 15  # seconds
-    distance_threshold = 20  # meters: alert if within 20m
+    # Alert parameters for person detection
+    last_person_alert_time = 0  # timestamp of the last alert
+    alert_interval = 15  # seconds between alerts
+    distance_threshold = 20  # meters threshold for alert
     person_known_height = 1.7  # average person height in meters
-    focal_length = 1340      # example focal length in pixels (adjust based on your camera)
-    # ------------------------------------------------------
+    focal_length = 1340       # example focal length in pixels
+
+    frame_count = 0  # Frame counter for logging frequency
 
     seen, windows, dt = 0, [], (Profile(device=device), Profile(device=device), Profile(device=device))
     for path, im, im0s, vid_cap, s in dataset:
+        frame_count += 1
         with dt[0]:
             im = torch.from_numpy(im).to(model.device)
-            im = im.half() if model.fp16 else im.float()  # uint8 to fp16/32
-            im /= 255  # scale 0-255 to 0.0-1.0
+            im = im.half() if model.fp16 else im.float()
+            im /= 255  # normalize
             if len(im.shape) == 3:
-                im = im[None]  # add batch dimension if needed
+                im = im[None]
             if model.xml and im.shape[0] > 1:
                 ims = torch.chunk(im, im.shape[0], 0)
 
@@ -178,10 +184,7 @@ def run(
         with dt[2]:
             pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
 
-        # Define the path for the CSV file
         csv_path = save_dir / "predictions.csv"
-
-        # Function to write CSV
         def write_to_csv(image_name, prediction, confidence):
             data = {"Image Name": image_name, "Prediction": prediction, "Confidence": confidence}
             file_exists = os.path.isfile(csv_path)
@@ -191,10 +194,10 @@ def run(
                     writer.writeheader()
                 writer.writerow(data)
 
-        # Process predictions
-        for i, det in enumerate(pred):  # per image
+        # Process predictions for each image in the batch
+        for i, det in enumerate(pred):
             seen += 1
-            if webcam:  # if batch_size >= 1
+            if webcam:
                 p, im0, frame = path[i], im0s[i].copy(), dataset.count
                 s += f"{i}: "
             else:
@@ -204,35 +207,32 @@ def run(
             save_path = str(save_dir / p.name)
             txt_path = str(save_dir / "labels" / p.stem) + ("" if dataset.mode == "image" else f"_{frame}")
             s += "{:g}x{:g} ".format(*im.shape[2:])
-            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain for bounding box
-            imc = im0.copy() if save_crop else im0  # for crop saving
+            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]
+            imc = im0.copy() if save_crop else im0
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
-            if len(det):
-                # Rescale boxes from inference image size to original image size
-                det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
 
-                # Print results for each unique detection class
-                for c in det[:, 5].unique():
-                    n = (det[:, 5] == c).sum()  # detections per class
-                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "
+            if len(det):
+                det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
 
                 # Process each detection
                 for *xyxy, conf, cls in reversed(det):
+                    # Only process detections with confidence >= 0.50 (extra check)
+                    if conf < 0.50:
+                        continue
+
                     c = int(cls)
+                    # Only process allowed classes
                     if names[c] not in allowed_classes:
                         continue
-                    
+
                     confidence = float(conf)
                     confidence_str = f"{confidence:.2f}"
-                    
-                    # If the detection is a person, estimate distance and possibly alert
+
+                    # For person detection, calculate distance and alert if needed
                     if names[c] == "person":
                         x1, y1, x2, y2 = map(int, xyxy)
                         bbox_height = y2 - y1
-                        if bbox_height > 0:
-                            distance = (person_known_height * focal_length) / bbox_height
-                        else:
-                            distance = float('inf')
+                        distance = (person_known_height * focal_length) / bbox_height if bbox_height > 0 else float('inf')
                         label_text = f"person {confidence_str} {distance:.1f}m"
                         current_time = time.time()
                         if distance <= distance_threshold and (current_time - last_person_alert_time >= alert_interval):
@@ -241,10 +241,8 @@ def run(
                     else:
                         label_text = names[c] if hide_conf else f"{names[c]} {confidence_str}"
 
-                    # Write CSV if enabled
                     if save_csv:
                         write_to_csv(p.name, label_text, confidence_str)
-                    # Write TXT if enabled
                     if save_txt:
                         if save_format == 0:
                             coords = ((xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist())
@@ -254,9 +252,7 @@ def run(
                         with open(f"{txt_path}.txt", "a") as f:
                             f.write(("%g " * len(line)).rstrip() % line + "\n")
 
-                    # Draw bounding box and label on image
-                    if save_img or save_crop or view_img:
-                        annotator.box_label(xyxy, label_text, color=colors(c, True))
+                    annotator.box_label(xyxy, label_text, color=colors(c, True))
                     if save_crop:
                         save_one_box(xyxy, imc, file=save_dir / "crops" / names[c] / f"{p.stem}.jpg", BGR=True)
 
@@ -270,7 +266,6 @@ def run(
                 cv2.imshow(str(p), im0)
                 cv2.waitKey(1)
 
-            # Save results (image or video)
             if save_img:
                 if dataset.mode == "image":
                     cv2.imwrite(save_path, im0)
@@ -289,7 +284,9 @@ def run(
                         vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
                     vid_writer[i].write(im0)
 
-        LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1e3:.1f}ms")
+            # Only log every 10 frames
+            if frame_count % 10 == 0:
+                LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1e3:.1f}ms")
 
     t = tuple(x.t / seen * 1e3 for x in dt)
     LOGGER.info(f"Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}" % t)
