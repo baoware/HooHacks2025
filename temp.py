@@ -1,53 +1,47 @@
-from gpiozero import Button
-import subprocess
-import time
-import os
-import signal
-import sys
+(venv) John@TWK:~/Desktop/TWK2025/Hoohacks2025/yolov5 $ python3 button.py
+/home/John/Desktop/TWK2025/Hoohacks2025/venv/lib/python3.11/site-packages/gpiozero/devices.py:300: PinFactoryFallback: Falling back from lgpio: No module named 'lgpio'
+  warnings.warn(
+/home/John/Desktop/TWK2025/Hoohacks2025/venv/lib/python3.11/site-packages/gpiozero/devices.py:300: PinFactoryFallback: Falling back from rpigpio: No module named 'RPi'
+  warnings.warn(
+/home/John/Desktop/TWK2025/Hoohacks2025/venv/lib/python3.11/site-packages/gpiozero/devices.py:300: PinFactoryFallback: Falling back from pigpio: No module named 'pigpio'
+  warnings.warn(
+/home/John/Desktop/TWK2025/Hoohacks2025/venv/lib/python3.11/site-packages/gpiozero/devices.py:297: NativePinFactoryFallback: Falling back to the experimental pin factory NativeFactory because no other pin factory could be loaded. For best results, install RPi.GPIO or pigpio. See https://gpiozero.readthedocs.io/en/stable/api_pins.html for more information.
+  warnings.warn(NativePinFactoryFallback(native_fallback_message))
+Traceback (most recent call last):
+  File "/home/John/Desktop/TWK2025/Hoohacks2025/venv/lib/python3.11/site-packages/gpiozero/pins/native.py", line 237, in export
+    result = self._exports[pin]
+             ~~~~~~~~~~~~~^^^^^
+KeyError: 17
 
-# Define the GPIO pin for the button (using GPIO 17 as an example)
-# hold_time=3 seconds means a long press triggers the long press callback.
-button = Button(17, hold_time=3)
+During handling of the above exception, another exception occurred:
 
-# Global variable to hold the process (if any)
-process = None
+Traceback (most recent call last):
+  File "/home/John/Desktop/TWK2025/Hoohacks2025/venv/lib/python3.11/site-packages/gpiozero/pins/native.py", line 247, in export
+    result = os.open(self.path_value(pin),
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/sys/class/gpio/gpio17/value'
 
-def toggle_program():
-    """
-    This function is called on a short button press.
-    If no process is running, it starts the program.
-    If a process is already running, it stops it.
-    """
-    global process
-    if process is None:
-        print("Starting the program...")
-        # Call your program here; for example, running a Python script.
-        # Replace "your_program.py" with your actual script or command.
-        process = subprocess.Popen(["python3", "your_program.py"])
-    else:
-        print("Stopping the program...")
-        os.kill(process.pid, signal.SIGTERM)
-        process = None
+During handling of the above exception, another exception occurred:
 
-def long_press_callback():
-    """
-    This function is called on a long press.
-    It raises a KeyboardInterrupt, which can be caught to shut down the program gracefully.
-    """
-    print("Long press detected. Raising KeyboardInterrupt!")
-    raise KeyboardInterrupt
-
-# Bind the toggle function to a short press and the long press callback to a long press.
-button.when_pressed = toggle_program
-button.when_held = long_press_callback
-
-print("System ready:")
-print("- Press the button briefly to start or stop the program.")
-print("- Hold the button for 3 seconds to simulate a KeyboardInterrupt.")
-
-try:
-    while True:
-        time.sleep(1)
-except KeyboardInterrupt:
-    print("KeyboardInterrupt caught. Exiting program gracefully.")
-    sys.exit(0)
+Traceback (most recent call last):
+  File "/home/John/Desktop/TWK2025/Hoohacks2025/yolov5/button.py", line 10, in <module>
+    button = Button(17, hold_time=3)
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/John/Desktop/TWK2025/Hoohacks2025/venv/lib/python3.11/site-packages/gpiozero/devices.py", line 108, in __call__
+    self = super().__call__(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/John/Desktop/TWK2025/Hoohacks2025/venv/lib/python3.11/site-packages/gpiozero/input_devices.py", line 412, in __init__
+    super().__init__(
+  File "/home/John/Desktop/TWK2025/Hoohacks2025/venv/lib/python3.11/site-packages/gpiozero/mixins.py", line 417, in __init__
+    super().__init__(*args, **kwargs)
+  File "/home/John/Desktop/TWK2025/Hoohacks2025/venv/lib/python3.11/site-packages/gpiozero/input_devices.py", line 167, in __init__
+    self.pin.edges = 'both'
+    ^^^^^^^^^^^^^^
+  File "/home/John/Desktop/TWK2025/Hoohacks2025/venv/lib/python3.11/site-packages/gpiozero/pins/__init__.py", line 441, in <lambda>
+    lambda self, value: self._set_edges(value),
+                        ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/John/Desktop/TWK2025/Hoohacks2025/venv/lib/python3.11/site-packages/gpiozero/pins/native.py", line 519, in _set_edges
+    self.factory.fs.export(self._number)
+  File "/home/John/Desktop/TWK2025/Hoohacks2025/venv/lib/python3.11/site-packages/gpiozero/pins/native.py", line 251, in export
+    with io.open(self.path('export'), 'wb') as f:
+OSError: [Errno 22] Invalid argument
