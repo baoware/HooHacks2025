@@ -61,6 +61,9 @@ while True:
 
     
     for *box, conf, cls in detections:
+        if conf < 0.50:
+            continue
+        
         class_id = int(cls)
         label = model.names[class_id]
 
