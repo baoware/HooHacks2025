@@ -7,13 +7,16 @@ from functions import get_roi_points, is_inside_roi, calculate_distance, check_i
 from alerts import alert_approaching, alert_incoming
 
 # Load the local yolov5
-model = torch.hub.load('./yolov5', 'yolov5s', source='local')
+model = torch.hub.load('./yolov5', 'yolov5n', source='local')
 model.eval()
 
 # Set of target obstacle classes (union from both scripts)
-target_classes = {
-    "person", "bench", "dog", "truck", "bus", "motorbike",
-    "bicycle", "stop sign", "fire hydrant", "traffic light"
+target_incoming_classes = {
+    "person", "dog", "bicycle"
+}
+
+target_approaching_classed = {
+    "stop sign", "traffic light"
 }
 
 # Approximate object heights for distance estimation
@@ -35,7 +38,7 @@ if not cap.isOpened():
     print("Error: Cannot open webcam")
     exit()
 
-frame_delay = 33  # 100ms delay (~10 fps)
+frame_delay = 30  # 100ms delay (~10 fps)
 prev_persons = []  # For simple frame-to-frame association of person detections
 
 while True:
@@ -61,14 +64,14 @@ while True:
 
     
     for *box, conf, cls in detections:
-        if conf < 0.50:
+        if conf < 0.6:
             continue
-        
+
         class_id = int(cls)
         label = model.names[class_id]
 
         # Process only targeted classes
-        if label not in target_classes:
+        if label not in target_incoming_classes:
             continue
 
         x1, y1, x2, y2 = map(int, box)
