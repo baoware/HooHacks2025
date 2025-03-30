@@ -5,32 +5,30 @@ import os
 import signal
 import sys
 
-# Define the GPIO pin for the button (using GPIO 17 as an example)
+# Use GPIO 17 with a hold time of 3 seconds for long-press detection
 button = Button(17, hold_time=3)
 
-# Global variable to hold the process (if any)
+# Global variable to track the running process (if any)
 process = None
 
-# Define your virtual environment's root path.
+# Define the path to your virtual environment's Python interpreter
 venv_path = "/home/John/Desktop/TWK2025/Hoohacks2025/venv"
 venv_python = os.path.join(venv_path, "bin", "python3")
 
 def toggle_program():
     """
-    On a short button press, run the obstacle detection program using the venv's Python.
-    The specific command is:
-      python3 yolov5/yolov5_obstacle_detection3.py --weights yolov5n.pt --source 0 --img 640
-    The output will appear in this terminal.
+    On a short button press:
+    - If the program is not running, start it.
+    - If the program is running, do nothing.
     """
     global process
     if process is None:
-        print("Starting the obstacle detection program in the current terminal...")
-
-        # Construct absolute paths for clarity.
+        print("Starting the obstacle detection program...")
+        # Construct absolute paths for clarity
         script_path = os.path.join(os.getcwd(), "yolov5", "yolov5_obstacle_detection3.py")
         weights_path = os.path.join(os.getcwd(), "yolov5n.pt")
-
-        # Build the command using the venv's Python interpreter.
+        
+        # Build the command using the venv's python
         cmd = [
             venv_python,
             script_path,
@@ -38,43 +36,38 @@ def toggle_program():
             "--source", "0",
             "--img", "640"
         ]
-
-        # Launch the process in the same terminal.
+        
+        # Start the program as a background process
         process = subprocess.Popen(cmd, env=os.environ.copy())
     else:
-        print("Program is already running. Doing nothing.")
+        print("Program is already running. To stop it, hold the button for 3 seconds.")
 
 def long_press_callback():
     """
-    On a long button press, simulate a KeyboardInterrupt.
-    This will terminate any running process and restart the button program.
+    On a long button press (3 seconds), stop the running program if it is running.
     """
-    print("Long press detected. Raising KeyboardInterrupt!")
-    raise KeyboardInterrupt
-
-# Bind the button events.
-button.when_pressed = toggle_program
-button.when_held = long_press_callback
+    global process
+    if process is not None:
+        print("Long press detected. Stopping the program...")
+        try:
+            os.kill(process.pid, signal.SIGTERM)
+            process.wait(timeout=5)
+        except Exception as e:
+            print("Error stopping process:", e)
+        process = None
+    else:
+        print("No program is running to stop.")
 
 def main():
     print("System ready:")
-    print("- Press the button briefly to run:")
-    print("  python3 yolov5/yolov5_obstacle_detection3.py --weights yolov5n.pt --source 0 --img 640")
-    print("- Hold the button for 3 seconds to simulate a KeyboardInterrupt and restart the button program.")
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("KeyboardInterrupt caught. Terminating any running program and restarting...")
-        global process
-        if process is not None:
-            try:
-                os.kill(process.pid, signal.SIGTERM)
-            except OSError:
-                pass
-            process = None
-        # Restart the button script (keeping it in the current terminal)
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+    print("- Press the button briefly to start the obstacle detection program (if not already running).")
+    print("- Hold the button for 3 seconds to stop the running program.")
+    while True:
+        time.sleep(1)
+
+# Bind the button events
+button.when_pressed = toggle_program
+button.when_held = long_press_callback
 
 if __name__ == '__main__':
     main()
