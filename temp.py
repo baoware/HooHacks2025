@@ -13,21 +13,20 @@ process = None
 
 def toggle_program():
     """
-    On a short button press, open a new terminal and run the obstacle detection program.
-    The terminal remains open after the program completes.
+    On a short button press, open a new terminal and run the specified obstacle detection command.
+    If the process is already running, do nothing.
     """
     global process
     if process is None:
         print("Starting the obstacle detection program in a new terminal...")
-        # Construct absolute paths for clarity.
-        script_path = os.path.join(os.getcwd(), "yolov5", "yolov5_obstacle_detection3.py")
-        weights_path = os.path.join(os.getcwd(), "yolov5n.pt")
-        # Build the command to run in a new terminal window.
-        # Using lxterminal with a bash command that ends with 'exec bash' to keep the terminal open.
+        # The specific command to run:
+        specific_command = "python3 yolov5/yolov5_obstacle_detection3.py --weights yolov5n.pt --source 0 --img 640"
+        # Build the command for lxterminal.
+        # 'bash -c' executes the specific command and then 'exec bash' keeps the terminal open.
         cmd = [
             "lxterminal",
             "-e",
-            f"bash -c '{sys.executable} {script_path} --weights {weights_path} --source 0 --img 640; exec bash'"
+            f"bash -c '{specific_command}; exec bash'"
         ]
         process = subprocess.Popen(cmd, env=os.environ.copy())
     else:
@@ -36,17 +35,18 @@ def toggle_program():
 def long_press_callback():
     """
     On a long button press, simulate a KeyboardInterrupt.
+    This will terminate the running process (if any) and restart the button program.
     """
     print("Long press detected. Raising KeyboardInterrupt!")
     raise KeyboardInterrupt
 
-# Bind the button events.
+# Bind the short press and long press events to their functions.
 button.when_pressed = toggle_program
 button.when_held = long_press_callback
 
 def main():
     print("System ready:")
-    print("- Press the button briefly to open a new terminal and run the obstacle detection program (if not already running).")
+    print("- Press the button briefly to open a new terminal and run the obstacle detection program.")
     print("- Hold the button for 3 seconds to simulate a KeyboardInterrupt and restart the button program.")
     try:
         while True:
@@ -58,9 +58,9 @@ def main():
             try:
                 os.kill(process.pid, signal.SIGTERM)
             except OSError:
-                pass  # Process may already have ended.
+                pass  # The process might have already terminated.
             process = None
-        # Restart this button script
+        # Restart the current script
         os.execv(sys.executable, [sys.executable] + sys.argv)
 
 if __name__ == '__main__':
