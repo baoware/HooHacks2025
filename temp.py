@@ -11,22 +11,44 @@ button = Button(17, hold_time=3)
 # Global variable to hold the process (if any)
 process = None
 
+
+
+
 def toggle_program():
-    """
-    On a short button press, start the obstacle detection program if it's not already running.
-    """
     global process
     if process is None:
         print("Starting the obstacle detection program...")
-        # Run the command to start the program.
-        process = subprocess.Popen([
-            "python3", "yolov5/yolov5_obstacle_detection3.py",
-            "--weights", "yolov5n.pt",
-            "--source", "0",
-            "--img", "640"
-        ])
+        process = subprocess.Popen(
+            [sys.executable, "yolov5/yolov5_obstacle_detection3.py",
+             "--weights", "yolov5n.pt",
+             "--source", "0",
+             "--img", "640"],
+            env=os.environ.copy(),  # explicitly pass the environment
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        # Optionally, capture output for debugging:
+        out, err = process.communicate(timeout=5)  # adjust timeout as needed
+        print("STDOUT:", out.decode())
+        print("STDERR:", err.decode())
     else:
         print("Program is already running. Doing nothing.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def long_press_callback():
     """
