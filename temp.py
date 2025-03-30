@@ -11,11 +11,16 @@ button = Button(17, hold_time=3)
 # Global variable to hold the process (if any)
 process = None
 
+# Define your virtual environment's root path.
+# Change this to the correct path for your setup.
+venv_path = "/home/John/Desktop/TWK2025/Hoohacks2025/venv"
+activate_script = os.path.join(venv_path, "bin", "activate")
+venv_python = os.path.join(venv_path, "bin", "python3")
+
 def toggle_program():
     """
-    On a short button press, open a new terminal, activate the current virtual environment,
-    and run the obstacle detection program with the specific parameters.
-    The command is:
+    On a short button press, open a new terminal, start a login shell,
+    source the virtual environment, and run the obstacle detection command:
       python3 yolov5/yolov5_obstacle_detection3.py --weights yolov5n.pt --source 0 --img 640
     The terminal will remain open after the command finishes.
     """
@@ -23,29 +28,23 @@ def toggle_program():
     if process is None:
         print("Starting the obstacle detection program in a new terminal...")
 
-        # Determine the path to your virtual environment's activation script.
-        # sys.executable should be something like '/path/to/venv/bin/python3'
-        venv_bin_dir = os.path.dirname(sys.executable)
-        activate_script = os.path.join(venv_bin_dir, "activate")
-
         # Construct absolute paths for clarity.
         script_path = os.path.join(os.getcwd(), "yolov5", "yolov5_obstacle_detection3.py")
         weights_path = os.path.join(os.getcwd(), "yolov5n.pt")
 
-        # Build the specific command you want to run.
-        # It sources the virtual environment activation script, then runs the command,
-        # and finally executes bash to keep the terminal open.
+        # Build the command:
+        # It first sources the virtual environment's activation script,
+        # then uses the venv's python to run the script with all the arguments,
+        # and finally calls "exec bash" to keep the terminal open.
         specific_command = (
-            f"source {activate_script}; "
-            f"python3 {script_path} --weights {weights_path} --source 0 --img 640; "
-            "exec bash"
+            f"source {activate_script} && {venv_python} {script_path} --weights {weights_path} --source 0 --img 640; exec bash"
         )
 
-        # Build the command for lxterminal.
+        # Launch the command in a new terminal window (using lxterminal).
         cmd = [
             "lxterminal",
             "-e",
-            f"bash -c '{specific_command}'"
+            f"bash -l -c \"{specific_command}\""
         ]
 
         process = subprocess.Popen(cmd, env=os.environ.copy())
@@ -79,9 +78,8 @@ def main():
             try:
                 os.kill(process.pid, signal.SIGTERM)
             except OSError:
-                pass  # Process may have already ended.
+                pass
             process = None
-        # Restart the current script (this reinitializes the button control)
         os.execv(sys.executable, [sys.executable] + sys.argv)
 
 if __name__ == '__main__':
