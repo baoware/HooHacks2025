@@ -11,44 +11,27 @@ button = Button(17, hold_time=3)
 # Global variable to hold the process (if any)
 process = None
 
-
-
-
 def toggle_program():
+    """
+    On a short button press, start the obstacle detection program if it's not already running.
+    The program's output will appear in the terminal.
+    """
     global process
     if process is None:
         print("Starting the obstacle detection program...")
+        # Construct absolute paths to avoid any ambiguity
+        script_path = os.path.join(os.getcwd(), "yolov5", "yolov5_obstacle_detection3.py")
+        weights_path = os.path.join(os.getcwd(), "yolov5n.pt")
         process = subprocess.Popen(
-            [sys.executable, "yolov5/yolov5_obstacle_detection3.py",
-             "--weights", "yolov5n.pt",
+            [sys.executable, script_path,
+             "--weights", weights_path,
              "--source", "0",
              "--img", "640"],
-            env=os.environ.copy(),  # explicitly pass the environment
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            env=os.environ.copy()  # Inherit current environment variables
+            # Do not set stdout/stderr here so they default to terminal output
         )
-        # Optionally, capture output for debugging:
-        out, err = process.communicate(timeout=5)  # adjust timeout as needed
-        print("STDOUT:", out.decode())
-        print("STDERR:", err.decode())
     else:
         print("Program is already running. Doing nothing.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 def long_press_callback():
     """
@@ -64,22 +47,21 @@ button.when_held = long_press_callback
 def main():
     print("System ready:")
     print("- Press the button briefly to start the obstacle detection program (if not already running).")
-    print("- Hold the button for 3 seconds to simulate a KeyboardInterrupt and restart this button program.")
+    print("- Hold the button for 3 seconds to simulate a KeyboardInterrupt and restart the button program.")
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
         print("KeyboardInterrupt caught. Terminating any running program and restarting...")
-        # If a child process is running, terminate it.
         global process
         if process is not None:
             try:
                 os.kill(process.pid, signal.SIGTERM)
             except OSError:
-                pass  # Process might already be terminated.
+                pass  # Process may already have ended.
             process = None
-        # Restart the script.
+        # Restart the current script (which reinitializes the button control)
         os.execv(sys.executable, [sys.executable] + sys.argv)
 
 if __name__ == '__main__':
