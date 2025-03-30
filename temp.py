@@ -1,43 +1,53 @@
-import serial
+from gpiozero import Button
+import subprocess
 import time
+import os
+import signal
+import sys
 
-# Adjust the device path if necessary (e.g., '/dev/ttyACM0' on Linux/Mac or 'COM3' on Windows)
-SERIAL_PORT = '/dev/ttyACM0'
-BAUD_RATE = 9600
+# Define the GPIO pin for the button (using GPIO 17 as an example)
+# hold_time=3 seconds means a long press triggers the long press callback.
+button = Button(17, hold_time=3)
 
-def send_command(command):
-    try:
-        with serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=2) as ser:
-            # Allow the Arduino to reset if necessary
-            time.sleep(2)
-            print(f"Sending: {command}")
-            ser.write((command + "\n").encode('utf-8'))
-            # Optionally, you can read a response:
-            # response = ser.readline().decode('utf-8').strip()
-            # print("Response:", response)
-    except serial.SerialException as e:
-        print("Error:", e)
+# Global variable to hold the process (if any)
+process = None
 
-def alert_high():
-    """Send a high-level alert command."""
-    send_command("ALERT HIGH")
+def toggle_program():
+    """
+    This function is called on a short button press.
+    If no process is running, it starts the program.
+    If a process is already running, it stops it.
+    """
+    global process
+    if process is None:
+        print("Starting the program...")
+        # Call your program here; for example, running a Python script.
+        # Replace "your_program.py" with your actual script or command.
+        process = subprocess.Popen(["python3", "your_program.py"])
+    else:
+        print("Stopping the program...")
+        os.kill(process.pid, signal.SIGTERM)
+        process = None
 
-def alert_medium():
-    """Send a medium-level alert command."""
-    send_command("ALERT MEDIUM")
+def long_press_callback():
+    """
+    This function is called on a long press.
+    It raises a KeyboardInterrupt, which can be caught to shut down the program gracefully.
+    """
+    print("Long press detected. Raising KeyboardInterrupt!")
+    raise KeyboardInterrupt
 
-def alert_low():
-    """Send a low-level alert command."""
-    send_command("ALERT LOW")
+# Bind the toggle function to a short press and the long press callback to a long press.
+button.when_pressed = toggle_program
+button.when_held = long_press_callback
 
-def main():
-    # Call each alert function with a delay between them.
-    alert_high()
-    time.sleep(7)  # Wait enough time for the high alert sequence to complete
-    alert_medium()
-    time.sleep(7)  # Wait enough time for the medium alert sequence to complete
-    alert_low()
-    time.sleep(7)  # Wait enough time for the low alert sequence to complete
+print("System ready:")
+print("- Press the button briefly to start or stop the program.")
+print("- Hold the button for 3 seconds to simulate a KeyboardInterrupt.")
 
-if __name__ == '__main__':
-    main()
+try:
+    while True:
+        time.sleep(1)
+except KeyboardInterrupt:
+    print("KeyboardInterrupt caught. Exiting program gracefully.")
+    sys.exit(0)
